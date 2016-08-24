@@ -146,6 +146,9 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="bits_macros.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="buttons.c">
       <SubType>compile</SubType>
     </Compile>

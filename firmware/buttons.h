@@ -82,7 +82,7 @@
 #define BUT_PRESSED_EN          0
 #define BUT_HELD_EN             1
 #define BUT_RELEASED_EN         1
-#define BUT_RELEASE_LONG_EN     0
+#define BUT_RELEASE_LONG_EN     1
 #define BUT_DOUBLE_CLICK_EN     0
 
 /* коды событий. могут принимать 
@@ -105,6 +105,7 @@ BUT_1_LEV    активный уровень пина
 BUT_1_PULL   0 - не включать подт€гивающий резистор, 1 - включать
 BUT_1_EVEN   список событий, которые фиксируетс€ в буфере (BUT_EV_PRESSED|BUT_EV_RELEASED|...)*/
 
+// ON/OFF
 #define BUT_1_ID     1
 #define BUT_1_DDRX   DDRC
 #define BUT_1_PORTX  PORTC
@@ -114,7 +115,7 @@ BUT_1_EVEN   список событий, которые фиксируетс€ в буфере (BUT_EV_PRESSED|BUT_EV
 #define BUT_1_PULL   1
 #define BUT_1_EVENT  (BUT_EV_RELEASED)
 
-
+// CH
 #define BUT_2_ID     2
 #define BUT_2_DDRX   DDRC
 #define BUT_2_PORTX  PORTC
@@ -124,7 +125,7 @@ BUT_1_EVEN   список событий, которые фиксируетс€ в буфере (BUT_EV_PRESSED|BUT_EV
 #define BUT_2_PULL   1
 #define BUT_2_EVENT  (BUT_EV_RELEASED)
 
-
+// DOWN
 #define BUT_3_ID     3
 #define BUT_3_DDRX   DDRD
 #define BUT_3_PORTX  PORTD
@@ -132,8 +133,9 @@ BUT_1_EVEN   список событий, которые фиксируетс€ в буфере (BUT_EV_PRESSED|BUT_EV
 #define BUT_3_PIN    3
 #define BUT_3_LEV    0
 #define BUT_3_PULL   1
-#define BUT_3_EVENT  (BUT_EV_RELEASED)
+#define BUT_3_EVENT  (BUT_EV_RELEASED|BUT_EV_HELD)
 
+// UP
 #define BUT_4_ID     4
 #define BUT_4_DDRX   DDRD
 #define BUT_4_PORTX  PORTD
@@ -141,7 +143,7 @@ BUT_1_EVEN   список событий, которые фиксируетс€ в буфере (BUT_EV_PRESSED|BUT_EV
 #define BUT_4_PIN    4
 #define BUT_4_LEV    0
 #define BUT_4_PULL   1
-#define BUT_4_EVENT  (BUT_EV_RELEASED)
+#define BUT_4_EVENT  (BUT_EV_RELEASED|BUT_EV_HELD)
 
 /**************** пользовательские функции *****************/
 

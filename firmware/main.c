@@ -5,15 +5,17 @@
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include <avr/pgmspace.h>
-//#include "port_macros.h"
+#include "bits_macros.h"
 #include "config.h"
 //#include "softtimers.h"
 #include "buttons.h"
 #include "managepwm.h"
 
+uint8_t EEMEM work_it = ON;
+
 // номер активного канала для регулировки
-uint8_t current_ch_saved EEMEM = 0;
-uint8_t current_ch = 0;
+uint8_t current_ch_saved EEMEM = 1;
+uint8_t current_ch = 1;
 
 // индексы таблицы значений шим для каждого из каналов
 uint8_t ch1_pwm_saved EEMEM = 0;
@@ -29,13 +31,16 @@ uint8_t but_code = 0; // код события нажатой кнопки
 
 // время, пока девайс активен ~5 сек
 #define WORKTIME 7800
-uint16_t work_time = WORKTIME;
+volatile uint16_t work_time = WORKTIME;
 // время мигания светодиода выбора канала
 #define FLICKTIME 150
-uint16_t flick_time = FLICKTIME;
+volatile uint16_t flick_time = FLICKTIME;
 // время задержки перед запуском функции опроса кнопок
 #define TIMEBUT 8
-uint16_t but_time = TIMEBUT;
+volatile uint16_t but_time = TIMEBUT;
+// время задержки переборе значений при зажатой кнопке
+#define TIMESTEP 100
+volatile uint16_t step_time = TIMESTEP;
 
 ISR(TIMER0_OVF_vect)
 {
@@ -59,6 +64,13 @@ ISR(TIMER0_OVF_vect)
 		if (but_time > 0) but_time--;
 		else flag.buttons = UNSET;
 	}
+	/*
+	// флаг запуска таймера задержки перебора значений при зажатой кнопке
+	if (flag.steps == SET) {
+		if (step_time > 0) step_time--;
+		else flag.steps = UNSET;
+	}
+	*/
 }
 
 void ResetWorkTime()
@@ -104,21 +116,130 @@ void Flickering(uint8_t chanel)
 	}
 }
 
+void LEDS(uint8_t chanel)
+{
+	if (flag.onoff == ON) {
+		if (flag.work == SET) {
+			LEDState(LEDOFF, OFF);
+			switch(chanel) {
+				case CH1:
+				LEDState(LED3, ON);
+				LEDState(LED2, ON);
+				break;
+				case CH2:
+				LEDState(LED1, ON);
+				LEDState(LED3, ON);
+				break;
+				case CH3:
+				LEDState(LED1, ON);
+				LEDState(LED2, ON);
+				break;
+			}
+			Flickering(chanel);
+		}
+	
+		if (flag.work == UNSET) {
+			LEDState(LED1, ON);
+			LEDState(LED2, ON);
+			LEDState(LED3, ON);
+			LEDState(LEDOFF, OFF);
+		}
+	} 
+	else {
+		LEDState(LED1, OFF);
+		LEDState(LED2, OFF);
+		LEDState(LED3, OFF);
+		LEDState(LEDOFF, ON);
+	}
+}
+
+void PWMOFF()
+{
+	//T2
+	TCCR2 &= ~(1<<COM21)|(1<<COM20);
+	//T1
+	TCCR1A &= ~(1<<COM1A1);
+	TCCR1A &= ~(1<<COM1B1);
+	PORTB &= ~(1<<PWM1)|(1<<PWM2)|(1<<PWM3);
+}
+
+void PWMON()
+{
+	//T2
+	TCCR2 |= (1<<COM21);
+	TCCR2 &= ~(1<<COM20);
+	//T1
+	TCCR1A |= (1<<COM1B1)|(1<<COM1A1);
+	TCCR1A &= ~(1<<COM1B0)|(1<<COM1A0);
+}
+
 int main(void)
 {
+
+		
 	// текущий канал
-	current_ch = eeprom_read_byte(&current_ch_saved);
+	if (eeprom_read_byte(&current_ch_saved) > CHNUM)
+	{
+		current_ch = 1;
+		eeprom_write_byte(&current_ch_saved, current_ch);
+	}
+	else
+	{
+		current_ch = eeprom_read_byte(&current_ch_saved);
+	}
+
 	// уровни на каждом канале
-	ch1_pwm = eeprom_read_byte(&ch1_pwm_saved);
-	ch2_pwm = eeprom_read_byte(&ch2_pwm_saved);
-	ch3_pwm = eeprom_read_byte(&ch3_pwm_saved);
+	if (eeprom_read_byte(&ch1_pwm_saved) >= PWMSIZE)
+	{
+		ch1_pwm = 0;
+		eeprom_write_byte(&ch1_pwm_saved, ch1_pwm);
+	}
+	else
+	{
+		ch1_pwm = eeprom_read_byte(&ch1_pwm_saved);
+	}
 	
+	if (eeprom_read_byte(&ch2_pwm_saved) >= PWMSIZE)
+	{
+		ch2_pwm = 0;
+		eeprom_write_byte(&ch2_pwm_saved, ch2_pwm);
+	}
+	else
+	{
+		ch2_pwm = eeprom_read_byte(&ch2_pwm_saved);
+	}
+	
+	if (eeprom_read_byte(&ch3_pwm_saved) >= PWMSIZE)
+	{
+		ch3_pwm = 0;
+		eeprom_write_byte(&ch3_pwm_saved, ch3_pwm);
+	}
+	else
+	{
+		ch3_pwm = eeprom_read_byte(&ch3_pwm_saved);
+	}
+	
+	SetSavedPWM();
 	BaseConfig();
 	BUT_Init();
-	SetSavedPWM();
-
+	WatchDogConfig();	
+	
+	if (eeprom_read_byte(&work_it) > 1)
+	{
+		flag.onoff = ON;
+		eeprom_write_byte(&work_it, ON);
+	}
+	else if (eeprom_read_byte(&work_it) == 1)
+	{
+		flag.onoff = ON;
+	}
+	else
+	{
+		flag.onoff = OFF;
+		PWMOFF();
+	}
+	
 	flag.flick = SET;
-	flag.onoff = ON;
 	
     while (1) 
     {
@@ -130,7 +251,7 @@ int main(void)
 			but = BUT_GetBut(); //проверка буфера
 			flag.buttons = SET;
 			
-			if (but)
+			if (but > 0)
 			{
 				but_code = BUT_GetBut();
 				switch(but){
@@ -138,16 +259,20 @@ int main(void)
 						if (but_code == BUT_RELEASED_CODE){
 							if (flag.onoff == ON) {
 								flag.onoff = OFF;
-								SetPWM(CH1, 0);
-								SetPWM(CH2, 0);
-								SetPWM(CH3, 0);
+								DisableInterrupt;
+								eeprom_write_byte(&work_it, OFF);
+								EnableInterrupt;
+								PWMOFF();
 								DisableInterrupt;
 								work_time = 0;
 								EnableInterrupt;
 							}
 							else {
 								flag.onoff = ON;
-								SetSavedPWM();
+								DisableInterrupt;
+								eeprom_write_byte(&work_it, ON);
+								EnableInterrupt;
+								PWMON();
 							}
 						}
 						break;
@@ -156,97 +281,76 @@ int main(void)
 							if (flag.onoff == ON) {
 								if (flag.work == UNSET) flag.work = SET;
 								else {
+									current_ch = eeprom_read_byte(&current_ch_saved);
 									if (current_ch < CHNUM) current_ch++;
 									else current_ch = 1;
+									DisableInterrupt;
+									eeprom_write_byte(&current_ch_saved, current_ch);
+									EnableInterrupt;
 								}
-								DisableInterrupt;
-								eeprom_write_byte(&current_ch_saved, current_ch);
-								EnableInterrupt;
 								ResetWorkTime();
 								ResetFlickTime();
-								/*DisableInterrupt;
-								flick_time = 0;
-								EnableInterrupt;*/
 							}
 						}
 						break;
+					
 					case BUT_DOWN:
 						if (but_code == BUT_RELEASED_CODE){
 							if (flag.work == SET) {
-								//DownPWM(current_ch);
+								DownPWM(current_ch);
 								ResetWorkTime();
 							}
 						}
+						/*else if (but_code == BUT_HELD_CODE) {
+							if (flag.work == SET) {
+								flag.start_steps = SET;
+								flag.steps = SET;
+							}
+						}*/
 						break;
+					
 					case BUT_UP:
 						if (but_code == BUT_RELEASED_CODE){
 							if (flag.work == SET) {
-								//DownPWM(current_ch);
-								//UpPWM(current_ch);
+								UpPWM(current_ch);
 								ResetWorkTime();
 							}
 						}
+						/*else if (but_code == BUT_HELD_CODE) {
+							if (flag.work == SET) {
+								flag.start_steps = SET;
+								flag.steps = SET;
+							}
+						}*/
 						break;
 				}
 			}
 		}
-		
-		
-		/*if (flag.onoff == ON)
-		{
-			if (flag.work == SET) {
-				switch(current_ch){
-					case CH1:
-					LED(LED1, ON);
-					LED(LED2, OFF);
-					LED(LED3, OFF);
-					break;
-					case CH2:
-					LED(LED2, ON);
-					LED(LED1, OFF);
-					LED(LED3, OFF);
-					break;
-					case CH3:
-					LED(LED3, ON);
-					LED(LED2, OFF);
-					LED(LED1, OFF);
-					break;
-			}
-		}*/
-		
-		
+		/*
 		if (flag.onoff == ON) {
 			if (flag.work == SET) {
-				LEDState(LEDOFF, OFF);
-				switch(current_ch) {
-					case CH1:
-					LEDState(LED3, ON);
-					LEDState(LED2, ON);
-					break;
-					case CH2:
-					LEDState(LED1, ON);
-					LEDState(LED3, ON);
-					break;
-					case CH3:
-					LEDState(LED1, ON);
-					LEDState(LED2, ON);
-					break;
+				
+				if (flag.start_steps == SET) {
+					
+					if (BitIsClear(PORTB, 3)) {
+						if (flag.steps == SET) {
+							UpPWM(current_ch);
+							flag.steps = UNSET;
+						}
+					}
+					else if (BitIsClear(PORTB, 4)) {
+						if (flag.steps == SET) {
+							DownPWM(current_ch);
+							flag.steps = UNSET;
+						}
+					}
+					else flag.start_steps = UNSET;
 				}
-			Flickering(current_ch);
-			}
 			
-			if (flag.work == UNSET) {
-				LEDState(LED1, ON);
-				LEDState(LED2, ON);
-				LEDState(LED3, ON);
-				LEDState(LEDOFF, OFF);
 			}
-		} else {
-			LEDState(LED1, OFF);
-			LEDState(LED2, OFF);
-			LEDState(LED3, OFF);
-			LEDState(LEDOFF, ON);
 		}
+		*/
+		LEDS(current_ch);
 
 	}
 }

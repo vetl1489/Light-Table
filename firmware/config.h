@@ -48,20 +48,11 @@ volatile struct rrr
 	_Bool work: 1;	
 	_Bool flick: 1;	// мигаем светиком
 	_Bool buttons: 1;	// кнопки опрашиваем
-	_Bool steps: 1;
+	_Bool start_steps: 1; //флаг запускающий перебор значений масива
+	_Bool steps: 1; // флаг запуска таймера задержки перебора значений при зажатой кнопке
 
 } flag;
 
-
-// организуем программные таймеры
-/*
-volatile struct
-{
-	unsigned char Number;		// Номер флага в флаговом байте
-	unsigned int Time;			// Выдержка в мс
-} SoftTimer[MAXTIMERS];   		// Очередь таймеров
-
-*/
 void BaseConfig();		// базовая конфигурация контроллера
 
 void WatchDogConfig();	// сторожевая собака
