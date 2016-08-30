@@ -1,29 +1,32 @@
 // https://translate.google.ru/
+#define F_CPU 8000000UL
 
 // ATMega8A
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include <avr/pgmspace.h>
+#include <util/delay.h>
 #include "bits_macros.h"
 #include "config.h"
 //#include "softtimers.h"
 #include "buttons.h"
 #include "managepwm.h"
 
+// сохраняем режим работы включено/выключено
 uint8_t EEMEM work_it = ON;
 
 // номер активного канала для регулировки
-uint8_t current_ch_saved EEMEM = 1;
+uint8_t EEMEM current_ch_saved = 1;
 uint8_t current_ch = 1;
 
 // индексы таблицы значений шим для каждого из каналов
-uint8_t ch1_pwm_saved EEMEM = 0;
-uint8_t ch2_pwm_saved EEMEM = 0;
-uint8_t ch3_pwm_saved EEMEM = 0;
-uint8_t ch1_pwm = 0;
-uint8_t ch2_pwm = 0;
-uint8_t ch3_pwm = 0;
+uint8_t EEMEM ch1_pwm_saved = 1;
+uint8_t EEMEM ch2_pwm_saved = 1;
+uint8_t EEMEM ch3_pwm_saved = 1;
+uint8_t ch1_pwm = 1;
+uint8_t ch2_pwm = 1;
+uint8_t ch3_pwm = 1;
 extern const uint8_t pwmtable[PWMSIZE] PROGMEM;
 
 uint8_t but = 0; // код нажатой кнопки
@@ -37,10 +40,11 @@ volatile uint16_t work_time = WORKTIME;
 volatile uint16_t flick_time = FLICKTIME;
 // время задержки перед запуском функции опроса кнопок
 #define TIMEBUT 8
-volatile uint16_t but_time = TIMEBUT;
+volatile uint8_t but_time = TIMEBUT;
+
 // время задержки переборе значений при зажатой кнопке
-#define TIMESTEP 100
-volatile uint16_t step_time = TIMESTEP;
+// #define TIMESTEP 100
+// volatile uint16_t step_time = TIMESTEP;
 
 ISR(TIMER0_OVF_vect)
 {
@@ -153,30 +157,12 @@ void LEDS(uint8_t chanel)
 	}
 }
 
-void PWMOFF()
-{
-	//T2
-	TCCR2 &= ~(1<<COM21)|(1<<COM20);
-	//T1
-	TCCR1A &= ~(1<<COM1A1);
-	TCCR1A &= ~(1<<COM1B1);
-	PORTB &= ~(1<<PWM1)|(1<<PWM2)|(1<<PWM3);
-}
-
-void PWMON()
-{
-	//T2
-	TCCR2 |= (1<<COM21);
-	TCCR2 &= ~(1<<COM20);
-	//T1
-	TCCR1A |= (1<<COM1B1)|(1<<COM1A1);
-	TCCR1A &= ~(1<<COM1B0)|(1<<COM1A0);
-}
 
 int main(void)
 {
-
-		
+	BaseConfig();
+	_delay_ms(300);
+	
 	// текущий канал
 	if (eeprom_read_byte(&current_ch_saved) > CHNUM)
 	{
@@ -191,7 +177,7 @@ int main(void)
 	// уровни на каждом канале
 	if (eeprom_read_byte(&ch1_pwm_saved) >= PWMSIZE)
 	{
-		ch1_pwm = 0;
+		ch1_pwm = 1;
 		eeprom_write_byte(&ch1_pwm_saved, ch1_pwm);
 	}
 	else
@@ -201,7 +187,7 @@ int main(void)
 	
 	if (eeprom_read_byte(&ch2_pwm_saved) >= PWMSIZE)
 	{
-		ch2_pwm = 0;
+		ch2_pwm = 1;
 		eeprom_write_byte(&ch2_pwm_saved, ch2_pwm);
 	}
 	else
@@ -211,7 +197,7 @@ int main(void)
 	
 	if (eeprom_read_byte(&ch3_pwm_saved) >= PWMSIZE)
 	{
-		ch3_pwm = 0;
+		ch3_pwm = 1;
 		eeprom_write_byte(&ch3_pwm_saved, ch3_pwm);
 	}
 	else
@@ -220,7 +206,6 @@ int main(void)
 	}
 	
 	SetSavedPWM();
-	BaseConfig();
 	BUT_Init();
 	WatchDogConfig();	
 	
@@ -236,7 +221,7 @@ int main(void)
 	else
 	{
 		flag.onoff = OFF;
-		PWMOFF();
+		PWMOFF(ALLCH);
 	}
 	
 	flag.flick = SET;
@@ -262,7 +247,7 @@ int main(void)
 								DisableInterrupt;
 								eeprom_write_byte(&work_it, OFF);
 								EnableInterrupt;
-								PWMOFF();
+								PWMOFF(ALLCH);
 								DisableInterrupt;
 								work_time = 0;
 								EnableInterrupt;
@@ -272,16 +257,21 @@ int main(void)
 								DisableInterrupt;
 								eeprom_write_byte(&work_it, ON);
 								EnableInterrupt;
-								PWMON();
+								if (ch1_pwm != 0) PWMON(CH1);
+								if (ch2_pwm != 0) PWMON(CH2);
+								if (ch3_pwm != 0) PWMON(CH3);
 							}
 						}
 						break;
+						
 					case BUT_CH:
 						if (but_code == BUT_RELEASED_CODE){
 							if (flag.onoff == ON) {
 								if (flag.work == UNSET) flag.work = SET;
 								else {
+									DisableInterrupt;
 									current_ch = eeprom_read_byte(&current_ch_saved);
+									EnableInterrupt;
 									if (current_ch < CHNUM) current_ch++;
 									else current_ch = 1;
 									DisableInterrupt;
@@ -297,7 +287,7 @@ int main(void)
 					case BUT_DOWN:
 						if (but_code == BUT_RELEASED_CODE){
 							if (flag.work == SET) {
-								DownPWM(current_ch);
+								DownPWM2(current_ch);
 								ResetWorkTime();
 							}
 						}
@@ -312,7 +302,7 @@ int main(void)
 					case BUT_UP:
 						if (but_code == BUT_RELEASED_CODE){
 							if (flag.work == SET) {
-								UpPWM(current_ch);
+								UpPWM2(current_ch);
 								ResetWorkTime();
 							}
 						}

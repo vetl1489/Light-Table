@@ -59,3 +59,60 @@ void WatchDogConfig()
 {
 	WDTCR |= (1<<WDE)|(1<<WDP1)|(1<<WDP2);
 }
+
+
+void PWMOFF(uint8_t chanel)
+{
+	switch(chanel)
+	{
+		case CH1:
+			TCCR1A &= ~(1<<COM1A1);
+			PORTB &= ~(1<<PWM2);
+			break;
+		
+		case CH2:
+			TCCR1A &= ~(1<<COM1B1);
+			PORTB &= ~(1<<PWM2);
+			break;
+		
+		case CH3:
+			TCCR2 &= ~(1<<COM21)|(1<<COM20);
+			PORTB &= ~(1<<PWM3);
+			break;
+		
+		case ALLCH:
+			TCCR2 &= ~(1<<COM21)|(1<<COM20);
+			TCCR1A &= ~(1<<COM1A1);
+			TCCR1A &= ~(1<<COM1B1);
+			PORTB &= ~(1<<PWM1)|(1<<PWM2)|(1<<PWM3);
+			break;
+	}
+}
+
+void PWMON(uint8_t chanel)
+{
+	switch(chanel)
+	{
+		case CH1:
+			TCCR1A |= (1<<COM1A1);
+			TCCR1A &= ~(1<<COM1A0);
+			break;
+		
+		case CH2:
+			TCCR1A |= (1<<COM1B1);
+			TCCR1A &= ~(1<<COM1B0);
+			break;
+		
+		case CH3:
+			TCCR2 |= (1<<COM21);
+			TCCR2 &= ~(1<<COM20);
+			break;
+		
+		case ALLCH:
+			TCCR2 |= (1<<COM21);
+			TCCR2 &= ~(1<<COM20);
+			TCCR1A |= (1<<COM1B1)|(1<<COM1A1);
+			TCCR1A &= ~(1<<COM1B0)|(1<<COM1A0);
+			break;
+	}
+}

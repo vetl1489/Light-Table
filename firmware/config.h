@@ -34,6 +34,7 @@
 #define CH1		1
 #define CH2		2
 #define CH3		3
+#define ALLCH	4
 
 #define BUT_OFF		1
 #define BUT_CH		2
@@ -56,5 +57,8 @@ volatile struct rrr
 void BaseConfig();		// базовая конфигурация контроллера
 
 void WatchDogConfig();	// сторожевая собака
+
+void PWMOFF(uint8_t chanel);
+void PWMON(uint8_t chanel);
 
 #endif

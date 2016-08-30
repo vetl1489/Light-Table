@@ -16,7 +16,7 @@
 #include "buttons.h"
 #include "managepwm.h"
 
-#define PWMSIZE 8
+#define PWMSIZE 9
 
 void SetSavedPWM();
 void SetPWM(uint8_t chanel, uint8_t level);
